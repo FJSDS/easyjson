@@ -178,6 +178,7 @@ func (g *Generator) printHeader() {
 
 	sort.Strings(aliases)
 	fmt.Println("import (")
+	fmt.Println("  unsafe")
 	for _, alias := range aliases {
 		fmt.Printf("  %s %q\n", alias, byAlias[alias])
 	}
@@ -191,6 +192,11 @@ func (g *Generator) printHeader() {
 	fmt.Println("   _ *jwriter.Writer")
 	fmt.Println("   _ easyjson.Marshaler")
 	fmt.Println(")")
+
+	fmt.Println()
+	fmt.Println("func bytesToString(d []byte) string {")
+	fmt.Println("   return *(*string)(unsafe.Pointer(&d))")
+	fmt.Println("}")
 
 	fmt.Println()
 }

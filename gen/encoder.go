@@ -462,5 +462,13 @@ func (g *Generator) genStructMarshaler(t reflect.Type) error {
 	fmt.Fprintln(g.out, "  "+fname+"(w, v)")
 	fmt.Fprintln(g.out, "}")
 
+	fmt.Fprintln(g.out, "func (v *"+typ+") String() string {")
+	fmt.Fprintln(g.out, "   data,err :=  v.MarshalJSON()")
+	fmt.Fprintln(g.out, "   if err !=nil{")
+	fmt.Fprintln(g.out, "       return err.Error()")
+	fmt.Fprintln(g.out, "   }")
+	fmt.Fprintln(g.out, "   return bytesToString(data)")
+	fmt.Fprintln(g.out, "}")
+
 	return nil
 }
