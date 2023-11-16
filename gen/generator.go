@@ -248,6 +248,7 @@ func (g *Generator) Run(out io.Writer) error {
 func (g *Generator) genModels() {
 	for _, m := range g.modelNames {
 		g.genModel(m)
+		g.genModelFlush(m)
 	}
 }
 
@@ -284,7 +285,8 @@ func (g *Generator) genModel(t reflect.Type) {
 		Data: unsafe.Pointer(out),
 	}
 	return out
-}\n`, typeName, tn, tn, tn, tn, n, tn)
+}
+`, typeName, tn, tn, tn, tn, n, tn)
 		fmt.Fprintln(g.out)
 	}
 }
