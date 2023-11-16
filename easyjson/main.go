@@ -74,6 +74,7 @@ func generate(fname string) (err error) {
 		PkgPath:                  p.PkgPath,
 		PkgName:                  p.PkgName,
 		Types:                    p.StructNames,
+		Models:                   p.Models,
 		SnakeCase:                *snakeCase,
 		LowerCamelCase:           *lowerCamelCase,
 		NoStdMarshalers:          *noStdMarshalers,

@@ -55,6 +55,8 @@ type Generator struct {
 	// function name to relevant type maps to track names of de-/encoders in
 	// case of a name clash or unnamed structs
 	functionNames map[string]reflect.Type
+
+	modelNames map[string]reflect.Type
 }
 
 // NewGenerator initializes and returns a Generator.
@@ -70,6 +72,7 @@ func NewGenerator(filename string) *Generator {
 		marshalers:    make(map[reflect.Type]bool),
 		typesSeen:     make(map[reflect.Type]bool),
 		functionNames: make(map[string]reflect.Type),
+		modelNames:    make(map[string]reflect.Type),
 	}
 
 	// Use a file-unique prefix on all auxiliary funcs to avoid
@@ -157,6 +160,14 @@ func (g *Generator) Add(obj interface{}) {
 	g.marshalers[t] = true
 }
 
+func (g *Generator) AddModel(obj interface{}) {
+	t := reflect.TypeOf(obj)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	g.modelNames[t.Name()] = t
+}
+
 // printHeader prints package declaration and imports.
 func (g *Generator) printHeader() {
 	if g.buildTags != "" {
@@ -228,9 +239,40 @@ func (g *Generator) Run(out io.Writer) error {
 			return err
 		}
 	}
+	g.genModels()
 	g.printHeader()
 	_, err := out.Write(g.out.Bytes())
 	return err
+}
+
+func (g *Generator) genModels() {
+	for _, m := range g.modelNames {
+		g.genModel(m)
+	}
+}
+
+func (g *Generator) genModel(t reflect.Type) {
+	typeName := t.Name()
+	num := t.NumField()
+	for i := 0; i < num; i++ {
+		tt := t.Field(i).Type
+		if tt.Kind() == reflect.Ptr {
+			tt = tt.Elem()
+		}
+		_, ok := g.marshalers[tt]
+		if !ok {
+			return
+		}
+		tn := t.Field(i).Type.String()
+		n := t.Field(i).Name
+		fmt.Fprintln(g.out, "func(v*"+typeName+")Save"+tn+"(d *"+tn+"){")
+		fmt.Fprintln(g.out, "v."+n+"=d."+n)
+		fmt.Fprintln(g.out, "}")
+
+		fmt.Fprintln(g.out, "func(v*"+typeName+")Get"+tn+"()*"+tn+"{")
+		fmt.Fprintln(g.out, "return v."+n+".DeepCopy()")
+		fmt.Fprintln(g.out, "}")
+	}
 }
 
 // fixes vendored paths

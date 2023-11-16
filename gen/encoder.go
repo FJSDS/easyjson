@@ -470,5 +470,8 @@ func (g *Generator) genStructMarshaler(t reflect.Type) error {
 	fmt.Fprintln(g.out, "   return bytesToString(data)")
 	fmt.Fprintln(g.out, "}")
 
+	fmt.Fprintln(g.out, "func (v *"+typ+")ModelName()string{")
+	fmt.Fprintln(g.out, "   return "+typ)
+	fmt.Fprintln(g.out, "}")
 	return nil
 }

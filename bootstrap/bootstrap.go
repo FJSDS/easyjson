@@ -23,9 +23,9 @@ const pkgLexer = "github.com/mailru/easyjson/jlexer"
 var buildFlagsRegexp = regexp.MustCompile("'.+'|\".+\"|\\S+")
 
 type Generator struct {
-	PkgPath, PkgName string
-	Types            []string
-
+	PkgPath, PkgName         string
+	Types                    []string
+	Models                   []string
 	NoStdMarshalers          bool
 	SnakeCase                bool
 	LowerCamelCase           bool
@@ -141,6 +141,9 @@ func (g *Generator) writeMain() (path string, err error) {
 	sort.Strings(g.Types)
 	for _, v := range g.Types {
 		fmt.Fprintln(f, "  g.Add(pkg.EasyJSON_exporter_"+v+"(nil))")
+	}
+	for _, v := range g.Models {
+		fmt.Fprintln(f, "  g.AddModel(pkg.EasyJSON_exporter_"+v+"(nil))")
 	}
 
 	fmt.Fprintln(f, "  if err := g.Run(os.Stdout); err != nil {")

@@ -11,12 +11,14 @@ import (
 const (
 	structComment     = "easyjson:json"
 	structSkipComment = "easyjson:skip"
+	structDataComment = "easyjson:model"
 )
 
 type Parser struct {
 	PkgPath     string
 	PkgName     string
 	StructNames []string
+	Models      []string
 	AllStructs  bool
 }
 
@@ -26,7 +28,7 @@ type visitor struct {
 	name string
 }
 
-func (p *Parser) needType(comments *ast.CommentGroup) (skip, explicit bool) {
+func (p *Parser) needType(comments *ast.CommentGroup) (skip, explicit, model bool) {
 	if comments == nil {
 		return
 	}
@@ -49,10 +51,13 @@ func (p *Parser) needType(comments *ast.CommentGroup) (skip, explicit bool) {
 			comment = strings.TrimSpace(comment)
 
 			if strings.HasPrefix(comment, structSkipComment) {
-				return true, false
+				return true, false, false
 			}
 			if strings.HasPrefix(comment, structComment) {
-				return false, true
+				return false, true, false
+			}
+			if strings.HasPrefix(comment, structDataComment) {
+				return false, false, true
 			}
 		}
 	}
@@ -69,9 +74,9 @@ func (v *visitor) Visit(n ast.Node) (w ast.Visitor) {
 		return v
 
 	case *ast.GenDecl:
-		skip, explicit := v.needType(n.Doc)
+		skip, explicit, model := v.needType(n.Doc)
 
-		if skip || explicit {
+		if skip || explicit || model {
 			for _, nc := range n.Specs {
 				switch nct := nc.(type) {
 				case *ast.TypeSpec:
@@ -82,7 +87,7 @@ func (v *visitor) Visit(n ast.Node) (w ast.Visitor) {
 
 		return v
 	case *ast.TypeSpec:
-		skip, explicit := v.needType(n.Doc)
+		skip, explicit, model := v.needType(n.Doc)
 		if skip {
 			return nil
 		}
@@ -93,9 +98,12 @@ func (v *visitor) Visit(n ast.Node) (w ast.Visitor) {
 		v.name = n.Name.String()
 
 		// Allow to specify non-structs explicitly independent of '-all' flag.
-		if explicit {
+		if explicit && !model {
 			v.StructNames = append(v.StructNames, v.name)
 			return nil
+		}
+		if model {
+			v.Models = append(v.Models, v.name)
 		}
 
 		return v
