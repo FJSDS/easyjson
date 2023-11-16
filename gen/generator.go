@@ -261,18 +261,70 @@ func (g *Generator) genModel(t reflect.Type) {
 		}
 		_, ok := g.marshalers[tt]
 		if !ok {
-			return
+			continue
 		}
-		tn := t.Field(i).Type.String()
+		tn := t.Field(i).Type.Name()
 		n := t.Field(i).Name
-		fmt.Fprintln(g.out, "func(v*"+typeName+")Save"+tn+"(d *"+tn+"){")
-		fmt.Fprintln(g.out, "v."+n+"=d."+n)
-		fmt.Fprintln(g.out, "}")
-
-		fmt.Fprintln(g.out, "func(v*"+typeName+")Get"+tn+"()*"+tn+"{")
-		fmt.Fprintln(g.out, "return v."+n+".DeepCopy()")
-		fmt.Fprintln(g.out, "}")
+		fmt.Fprintf(g.out, `
+	func (v *%s) Save%s(d *%s) {
+		v.saveMap["%s"] = DataState{
+		Data: unsafe.Pointer(d),
+		NeedSave: true,
 	}
+}
+`, typeName, tn, tn, tn)
+
+		fmt.Fprintf(g.out, `func (v *%s) Get%s() *%s {
+	ptr,ok:= v.saveMap["%s"]
+	if ok {
+		return (*%s)(ptr.Data)
+	}
+	out:=v.%s.DeepCopy()
+	v.saveMap["%s"]=DataState{
+		Data: unsafe.Pointer(out),
+	}
+	return out
+}\n`, typeName, tn, tn, tn, tn, n, tn)
+		fmt.Fprintln(g.out)
+	}
+}
+
+func (g *Generator) genModelFlush(t reflect.Type) {
+	typeName := t.Name()
+	fmt.Fprintf(g.out, `func (v*%s) Flush() []DataInterface{
+	out:=make([]DataInterface, 0,4)
+	for k,s:=range v.saveMap{
+		if !s.NeedSave{
+			continue
+		}
+		switch k {
+`, typeName)
+	num := t.NumField()
+	for i := 0; i < num; i++ {
+		tt := t.Field(i).Type
+		if tt.Kind() == reflect.Ptr {
+			tt = tt.Elem()
+		}
+		_, ok := g.marshalers[tt]
+		if !ok {
+			continue
+		}
+		tn := t.Field(i).Type.Name()
+		n := t.Field(i).Name
+		fmt.Fprintf(g.out, `
+		case "%s":
+			swap:=(*%s)(s.Data)
+			v.%s = *swap
+			out=append(out,swap)`, tn, tn, n)
+	}
+	fmt.Fprintln(g.out, `
+default:
+			panic("unknown Flush Data:"+k)
+		}
+	}
+	clear(v.saveMap)
+	return out
+}`)
 }
 
 // fixes vendored paths
