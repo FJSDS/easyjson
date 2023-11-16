@@ -178,7 +178,7 @@ func (g *Generator) printHeader() {
 
 	sort.Strings(aliases)
 	fmt.Println("import (")
-	fmt.Println("  unsafe")
+	fmt.Println(`  "unsafe"`)
 	for _, alias := range aliases {
 		fmt.Printf("  %s %q\n", alias, byAlias[alias])
 	}
