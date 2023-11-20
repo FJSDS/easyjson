@@ -471,7 +471,9 @@ func (g *Generator) genStructMarshaler(t reflect.Type) error {
 	fmt.Fprintln(g.out, "}")
 
 	fmt.Fprintln(g.out, "func (v *"+typ+")ModelName()string{")
-	fmt.Fprintln(g.out, "   return \""+typ+"\"")
+	fmt.Fprintln(g.out, "   return ModelName"+typ)
 	fmt.Fprintln(g.out, "}")
+
+	fmt.Fprintln(g.out, "const ModelName"+typ+" = \""+SnakeCase(typ)+"s\"")
 	return nil
 }
