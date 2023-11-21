@@ -475,5 +475,21 @@ func (g *Generator) genStructMarshaler(t reflect.Type) error {
 	fmt.Fprintln(g.out, "}")
 
 	fmt.Fprintln(g.out, "const ModelName"+typ+" = \""+SnakeCase(typ)+"s\"")
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	fieldNum := t.NumField()
+	for i := 0; i < fieldNum; i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("bson")
+		if tag == "_id" {
+			fmt.Fprintln(g.out, "func (v *"+typ+")PK()any{")
+			fmt.Fprintln(g.out, "   return v."+field.Name)
+			fmt.Fprintln(g.out, "}")
+			break
+		}
+	}
+
 	return nil
 }
