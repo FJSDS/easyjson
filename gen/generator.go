@@ -293,14 +293,8 @@ func (g *Generator) genModel(t reflect.Type) {
 
 func (g *Generator) genModelFlush(t reflect.Type) {
 	typeName := t.Name()
-	fmt.Fprintf(g.out, `func (v*%s) Flush() []DataInterface{
-	out:=make([]DataInterface, 0,4)
-	for k,s:=range v.saveMap{
-		if !s.NeedSave{
-			continue
-		}
-		switch k {
-`, typeName)
+	fmt.Fprintf(g.out, `var saveMapFunc%s = map[string]func(*%s,unsafe.Pointer)DataInterface{
+`, typeName, typeName)
 	num := t.NumField()
 	for i := 0; i < num; i++ {
 		tt := t.Field(i).Type
@@ -313,20 +307,31 @@ func (g *Generator) genModelFlush(t reflect.Type) {
 		}
 		tn := t.Field(i).Type.Name()
 		n := t.Field(i).Name
-		fmt.Fprintf(g.out, `
-		case "%s":
-			swap:=(*%s)(s.Data)
-			v.%s = *swap
-			out=append(out,swap)`, tn, tn, n)
+		fmt.Fprintf(g.out, `"%s": func(ud*%s,d unsafe.Pointer)DataInterface {
+		swap := (*%s)(d)
+		ud.%s = *swap
+		return swap
+	},`, tn, typeName, tn, n)
 	}
-	fmt.Fprintln(g.out, `
-default:
-			panic("unknown Flush Data:"+k)
+	fmt.Fprintln(g.out, "}")
+
+	fmt.Fprintf(g.out, `func (v *%s) Flush() []DataInterface {
+	out := make([]DataInterface, 0, 4)
+	for k, s := range v.saveMap {
+		if !s.NeedSave {
+			continue
 		}
+		f, ok := saveMapFunc%s[k]
+		if !ok {
+			panic("unknown Flush %s:" + k)
+		}
+		out = append(out, f(v, s.Data))
 	}
 	clear(v.saveMap)
 	return out
-}`)
+}
+`, typeName, typeName, typeName)
+
 }
 
 // fixes vendored paths
