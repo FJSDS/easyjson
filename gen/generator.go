@@ -63,10 +63,11 @@ type Generator struct {
 func NewGenerator(filename string) *Generator {
 	ret := &Generator{
 		imports: map[string]string{
-			pkgWriter:       "jwriter",
-			pkgLexer:        "jlexer",
-			pkgEasyJSON:     "easyjson",
-			"encoding/json": "json",
+			pkgWriter:                    "jwriter",
+			pkgLexer:                     "jlexer",
+			pkgEasyJSON:                  "easyjson",
+			"encoding/json":              "json",
+			"train-server/common/mongom": "mongom",
 		},
 		fieldNamer:    DefaultFieldNamer{},
 		marshalers:    make(map[reflect.Type]bool),
@@ -215,9 +216,10 @@ func (g *Generator) printHeader() {
 // Run runs the generator and outputs generated code to out.
 func (g *Generator) Run(out io.Writer) error {
 	g.out = &bytes.Buffer{}
-
+	unseen := make([]reflect.Type, 0, len(g.typesUnseen))
 	for len(g.typesUnseen) > 0 {
 		t := g.typesUnseen[len(g.typesUnseen)-1]
+		unseen = append(unseen, t)
 		g.typesUnseen = g.typesUnseen[:len(g.typesUnseen)-1]
 		g.typesSeen[t] = true
 
@@ -241,8 +243,29 @@ func (g *Generator) Run(out io.Writer) error {
 	}
 	g.genModels()
 	g.printHeader()
+	g.genTypesIndex(unseen)
 	_, err := out.Write(g.out.Bytes())
 	return err
+}
+
+func (g *Generator) genTypesIndex(ts []reflect.Type) {
+	fmt.Fprintln(g.out, `func InitModelIndex(){`)
+	for _, k := range ts {
+		if k.Kind() == reflect.Ptr {
+			k = k.Elem()
+		}
+		fieldNum := k.NumField()
+		for i := 0; i < fieldNum; i++ {
+			field := k.Field(i)
+			tag := field.Tag.Get("bson")
+			if tag == "_id" {
+				name := k.Name()
+				fmt.Fprintln(g.out, `mongom.RegisterModel(&`+name+`{})`)
+				break
+			}
+		}
+	}
+	fmt.Fprintln(g.out, `}`)
 }
 
 func (g *Generator) genModels() {
@@ -257,33 +280,101 @@ func (g *Generator) genModel(t reflect.Type) {
 	num := t.NumField()
 	for i := 0; i < num; i++ {
 		tt := t.Field(i).Type
+		n := t.Field(i).Name
+		if tt.Kind() == reflect.Map {
+			valueType := tt.Elem()
+			if valueType.Kind() == reflect.Ptr {
+				valueType = valueType.Elem()
+			}
+			_, ok := g.marshalers[valueType]
+			if !ok {
+				continue
+			}
+			keyType := tt.Key()
+			found := false
+			var keyField reflect.StructField
+			for i := 0; i < valueType.NumField(); i++ {
+				field := valueType.Field(i)
+				if strings.Contains(string(field.Tag), "map_key") {
+					if keyType.Name() == field.Type.Name() {
+						found = true
+						keyField = field
+					} else {
+						panic(fmt.Sprintf("map field key type is %s,but got map_key type is %s[%s]", keyType.Name(), field.Type.Name(), field.Name))
+					}
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			fmt.Fprintf(g.out, `
+	func (v *%s) Save%s(t *%s) {
+		save := v.saveMap["%s"]
+		if save == nil {
+			save = &DataState{MapData: map[int64]unsafe.Pointer{}}
+			v.saveMap["%s"]=save
+		}
+		save.MapData[t.%s] = unsafe.Pointer(t)
+}
+`, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name)
+			lowerKeyFieldName := ToLowerFirst(keyField.Name)
+			fmt.Fprintf(g.out, `func (v *%s) Get%s(%s int64) (*%s, bool) {
+	save := v.saveMap["%s"]
+	if save != nil && save.MapData != nil {
+		t, ok := save.MapData[%s]
+		if ok {
+			return (*%s)(t), true
+		}
+	}
+	old, ok := v.%s[%s]
+	if ok {
+		out := old.DeepCopy()
+		if save == nil {
+			save = &DataState{MapData: map[int64]unsafe.Pointer{}}
+			v.saveMap["%s"] = save
+		}
+		save.MapData[%s] = unsafe.Pointer(out)
+		return out, true
+	}
+	return nil, false
+}
+`, typeName, valueType.Name(), lowerKeyFieldName, valueType.Name(), valueType.Name(), lowerKeyFieldName,
+				valueType.Name(), n, lowerKeyFieldName, valueType.Name(), lowerKeyFieldName)
+			continue
+		}
+
 		if tt.Kind() == reflect.Ptr {
 			tt = tt.Elem()
 		}
+
 		_, ok := g.marshalers[tt]
 		if !ok {
 			continue
 		}
-		tn := t.Field(i).Type.Name()
-		n := t.Field(i).Name
+		tn := tt.Name()
 		fmt.Fprintf(g.out, `
 	func (v *%s) Save%s(d *%s) {
-		v.saveMap["%s"] = DataState{
-		Data: unsafe.Pointer(d),
-		NeedSave: true,
-	}
+		ptr,ok:= v.saveMap["%s"]
+		if !ok{
+			ptr = &DataState{}
+			v.saveMap["%s"]=ptr
+		}
+		ptr.Data=unsafe.Pointer(d)
 }
-`, typeName, tn, tn, tn)
+`, typeName, tn, tn, tn, tn)
 
 		fmt.Fprintf(g.out, `func (v *%s) Get%s() *%s {
-	ptr,ok:= v.saveMap["%s"]
+	ptr, ok := v.saveMap["%s"]
 	if ok {
 		return (*%s)(ptr.Data)
 	}
-	out:=v.%s.DeepCopy()
-	v.saveMap["%s"]=DataState{
-		Data: unsafe.Pointer(out),
+	out := v.%s.DeepCopy()
+	if !ok{
+		ptr = &DataState{}
+		v.saveMap["%s"]=ptr
 	}
+	ptr.Data = unsafe.Pointer(out)
 	return out
 }
 `, typeName, tn, tn, tn, tn, n, tn)
@@ -298,6 +389,43 @@ func (g *Generator) genModelFlush(t reflect.Type) {
 	num := t.NumField()
 	for i := 0; i < num; i++ {
 		tt := t.Field(i).Type
+		tn := t.Field(i).Type.Name()
+		n := t.Field(i).Name
+		if tt.Kind() == reflect.Map {
+			valueType := tt.Elem()
+			if valueType.Kind() == reflect.Ptr {
+				valueType = valueType.Elem()
+			}
+			_, ok := g.marshalers[valueType]
+			if !ok {
+				continue
+			}
+			keyType := tt.Key()
+			found := false
+			var keyField reflect.StructField
+			for i := 0; i < valueType.NumField(); i++ {
+				field := valueType.Field(i)
+				if strings.Contains(string(field.Tag), "map_key") {
+					if keyType.Name() == field.Type.Name() {
+						found = true
+						keyField = field
+					} else {
+						panic(fmt.Sprintf("map field key type is %s,but got map_key type is %s[%s]", keyType.Name(), field.Type.Name(), field.Name))
+					}
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			fmt.Fprintf(g.out, `"%s": func(ud*%s,d unsafe.Pointer)DataInterface {
+		swap := (*%s)(d)
+		ud.%s[swap.%s] = swap
+		return swap
+	},`, valueType.Name(), typeName, valueType.Name(), n, keyField.Name)
+			continue
+		}
+
 		if tt.Kind() == reflect.Ptr {
 			tt = tt.Elem()
 		}
@@ -305,8 +433,7 @@ func (g *Generator) genModelFlush(t reflect.Type) {
 		if !ok {
 			continue
 		}
-		tn := t.Field(i).Type.Name()
-		n := t.Field(i).Name
+
 		fmt.Fprintf(g.out, `"%s": func(ud*%s,d unsafe.Pointer)DataInterface {
 		swap := (*%s)(d)
 		ud.%s = *swap
@@ -325,7 +452,13 @@ func (g *Generator) genModelFlush(t reflect.Type) {
 		if !ok {
 			panic("unknown Flush %s:" + k)
 		}
-		out = append(out, f(v, s.Data))
+		 if s.Data!=nil && s.MapData==nil{
+          out = append(out, f(v, s.Data))
+        }else if  s.Data==nil && s.MapData!=nil{
+          for _,md:=range s.MapData{
+            out = append(out, f(v, md))
+          }
+        }
 	}
 	clear(v.saveMap)
 	return out

@@ -23,6 +23,20 @@ func isDelimiter(ch rune) bool {
 	return ch == '-' || ch == '_' || isSpaceRune(ch)
 }
 
+func ToLowerFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	if s[0] >= 'A' && s[0] <= 'Z' {
+		n := s[0] + 32
+		b := strings.Builder{}
+		b.WriteByte(n)
+		b.WriteString(s[1:])
+		return b.String()
+	}
+	return s
+}
+
 func isUpperRune(ch rune) bool {
 	return ch >= 'A' && ch <= 'Z'
 }
