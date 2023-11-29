@@ -316,6 +316,7 @@ func (g *Generator) genModel(t reflect.Type) {
 			v.saveMap["%s"]=save
 		}
 		save.MapData[t.%s] = unsafe.Pointer(t)
+		save.NeedSave = true
 }
 `, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name)
 			lowerKeyFieldName := ToLowerFirst(keyField.Name)
@@ -361,6 +362,7 @@ func (g *Generator) genModel(t reflect.Type) {
 			v.saveMap["%s"]=ptr
 		}
 		ptr.Data=unsafe.Pointer(d)
+		ptr.NeedSave = true
 }
 `, typeName, tn, tn, tn, tn)
 
