@@ -271,7 +271,8 @@ func (g *Generator) genTypesIndex(ts []reflect.Type) {
 func (g *Generator) genModels() {
 	for _, m := range g.modelNames {
 		g.genModel(m)
-		g.genModelFlush(m)
+		g.genModelFlushSave(m)
+		g.genModelFlushDelete(m)
 	}
 }
 
@@ -312,15 +313,72 @@ func (g *Generator) genModel(t reflect.Type) {
 	func (v *%s) Save%s(t *%s) {
 		save := v.saveMap["%s"]
 		if save == nil {
-			save = &DataState{MapData: map[int64]unsafe.Pointer{}}
+			save = &DataState{}
 			v.saveMap["%s"]=save
+		}
+		if save.MapData == nil {
+			save.MapData= map[int64]unsafe.Pointer{}
+		}
+		if save.DelData!=nil{
+			delete(save.DelData,t.%s)
 		}
 		save.MapData[t.%s] = unsafe.Pointer(t)
 		save.NeedSave = true
 }
-`, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name)
+`, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name, keyField.Name)
+			fmt.Fprintf(g.out, `
+	func (v *%s) Delete%s(t *%s) {
+		save := v.saveMap["%s"]
+		if save == nil {
+			save = &DataState{}
+			v.saveMap["%s"] = save
+		}
+		if save.DelData==nil{
+			save.DelData= map[int64]unsafe.Pointer{}
+		}
+		if save.MapData!=nil{
+			delete(save.MapData,t.%s)
+		}
+		save.DelData[t.%s] = unsafe.Pointer(t)
+		save.NeedSave = true
+}
+`, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name, keyField.Name)
+
+			ttType := fmt.Sprintf("map[%s]*%s", keyType.Name(), valueType.Name())
+			fmt.Fprintf(g.out, `
+func (v *%s)GetAll%ss() %s  {
+	save := v.saveMap["%s"]
+	if save == nil {
+		save = &DataState{}
+		v.saveMap["%s"] = save
+	}
+	if save.MapData==nil{
+		save.MapData = map[int64]unsafe.Pointer{}
+	}
+	out:=make(%s,len(v.%s))
+	for _,tmp:=range v.%s {
+		if save.DelData!=nil{
+			if _,ok:=save.DelData[tmp.%s];ok{
+				continue
+			}
+		}
+		if save.MapData!=nil{
+			if v,ok:=save.MapData[tmp.%s];ok{
+				out[tmp.%s] = (*%s)(v)
+				continue
+			}
+		}
+		cpy:=tmp.DeepCopy()
+		out[tmp.%s] = tmp.DeepCopy()
+		save.MapData[tmp.%s] = unsafe.Pointer(cpy)
+	}
+	return out
+}
+`, typeName, valueType.Name(), ttType, valueType.Name(), valueType.Name(), ttType, n, n, keyField.Name,
+				keyField.Name, keyField.Name, valueType.Name(), keyField.Name, keyField.Name)
+
 			lowerKeyFieldName := ToLowerFirst(keyField.Name)
-			fmt.Fprintf(g.out, `func (v *%s) Get%s(%s int64) (*%s, bool) {
+			fmt.Fprintf(g.out, `func (v *%s) Get%s(%s %s) (*%s, bool) {
 	save := v.saveMap["%s"]
 	if save != nil && save.MapData != nil {
 		t, ok := save.MapData[%s]
@@ -340,7 +398,7 @@ func (g *Generator) genModel(t reflect.Type) {
 	}
 	return nil, false
 }
-`, typeName, valueType.Name(), lowerKeyFieldName, valueType.Name(), valueType.Name(), lowerKeyFieldName,
+`, typeName, valueType.Name(), lowerKeyFieldName, keyField.Type.Name(), valueType.Name(), valueType.Name(), lowerKeyFieldName,
 				valueType.Name(), n, lowerKeyFieldName, valueType.Name(), lowerKeyFieldName)
 			continue
 		}
@@ -384,7 +442,7 @@ func (g *Generator) genModel(t reflect.Type) {
 	}
 }
 
-func (g *Generator) genModelFlush(t reflect.Type) {
+func (g *Generator) genModelFlushSave(t reflect.Type) {
 	typeName := t.Name()
 	fmt.Fprintf(g.out, `var saveMapFunc%s = map[string]func(*%s,unsafe.Pointer)DataInterface{
 `, typeName, typeName)
@@ -444,29 +502,90 @@ func (g *Generator) genModelFlush(t reflect.Type) {
 	}
 	fmt.Fprintln(g.out, "}")
 
-	fmt.Fprintf(g.out, `func (v *%s) Flush() []DataInterface {
-	out := make([]DataInterface, 0, 4)
+	fmt.Fprintf(g.out, `func (v *%s) Flush() ([]DataInterface,[]DataInterface) {
+	outSave := make([]DataInterface, 0, 4)
+	outDelete:=make([]DataInterface, 0,4)
 	for k, s := range v.saveMap {
 		if !s.NeedSave {
 			continue
 		}
-		f, ok := saveMapFunc%s[k]
-		if !ok {
-			panic("unknown Flush %s:" + k)
-		}
+	
 		 if s.Data!=nil && s.MapData==nil{
-          out = append(out, f(v, s.Data))
+			f, ok := saveMapFunc%s[k]
+			if !ok {
+				panic("unknown Flush %s:" + k)
+			}
+            outSave = append(outSave, f(v, s.Data))
         }else if  s.Data==nil && s.MapData!=nil{
+			f, ok := saveMapFunc%s[k]
+			if !ok {
+				panic("unknown Flush %s:" + k)
+			}
           for _,md:=range s.MapData{
-            out = append(out, f(v, md))
+            outSave = append(outSave, f(v, md))
           }
-        }
+        }else{
+			if s.DelData!=nil && len(s.DelData)>0{
+				f, ok := deleteMapFunc%s[k]
+				if !ok {
+					panic("unknown Flush Delete %s:" + k)
+				}
+				for _, md := range s.DelData {
+					outDelete = append(outDelete, f(v, md))
+				}
+			}
+		}
 	}
 	clear(v.saveMap)
-	return out
+	return outSave,outDelete
 }
-`, typeName, typeName, typeName)
+`, typeName, typeName, typeName, typeName, typeName, typeName, typeName)
+}
 
+func (g *Generator) genModelFlushDelete(t reflect.Type) {
+	typeName := t.Name()
+	fmt.Fprintf(g.out, `var deleteMapFunc%s = map[string]func(*%s,unsafe.Pointer)DataInterface{
+`, typeName, typeName)
+	num := t.NumField()
+	for i := 0; i < num; i++ {
+		tt := t.Field(i).Type
+		n := t.Field(i).Name
+		if tt.Kind() == reflect.Map {
+			valueType := tt.Elem()
+			if valueType.Kind() == reflect.Ptr {
+				valueType = valueType.Elem()
+			}
+			_, ok := g.marshalers[valueType]
+			if !ok {
+				continue
+			}
+			keyType := tt.Key()
+			found := false
+			var keyField reflect.StructField
+			for i := 0; i < valueType.NumField(); i++ {
+				field := valueType.Field(i)
+				if strings.Contains(string(field.Tag), "map_key") {
+					if keyType.Name() == field.Type.Name() {
+						found = true
+						keyField = field
+					} else {
+						panic(fmt.Sprintf("map field key type is %s,but got map_key type is %s[%s]", keyType.Name(), field.Type.Name(), field.Name))
+					}
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			fmt.Fprintf(g.out, `"%s": func(ud*%s,d unsafe.Pointer)DataInterface {
+		swap := (*%s)(d)
+		delete(ud.%s,swap.%s)
+		return swap
+	},`, valueType.Name(), typeName, valueType.Name(), n, keyField.Name)
+			continue
+		}
+	}
+	fmt.Fprintln(g.out, "}")
 }
 
 // fixes vendored paths
