@@ -518,22 +518,23 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 			}
             outSave = append(outSave, f(v, s.Data))
         }else if  s.Data==nil && s.MapData!=nil{
-			f, ok := saveMapFunc%s[k]
-			if !ok {
-				panic("unknown Flush %s:" + k)
-			}
-          for _,md:=range s.MapData{
-            outSave = append(outSave, f(v, md))
-          }
-        }else{
-			if s.DelData!=nil && len(s.DelData)>0{
-				f, ok := deleteMapFunc%s[k]
+			if len(s.MapData)>0{
+				f, ok := saveMapFunc%s[k]
 				if !ok {
-					panic("unknown Flush Delete %s:" + k)
+					panic("unknown Flush %s:" + k)
 				}
-				for _, md := range s.DelData {
-					outDelete = append(outDelete, f(v, md))
+	            for _,md:=range s.MapData{
+	              outSave = append(outSave, f(v, md))
 				}
+			}
+        }
+		if s.DelData!=nil && len(s.DelData)>0{
+			f, ok := deleteMapFunc%s[k]
+			if !ok {
+				panic("unknown Flush Delete %s:" + k)
+			}
+			for _, md := range s.DelData {
+				outDelete = append(outDelete, f(v, md))
 			}
 		}
 	}
