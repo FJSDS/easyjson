@@ -68,6 +68,7 @@ func NewGenerator(filename string) *Generator {
 			pkgEasyJSON:                  "easyjson",
 			"encoding/json":              "json",
 			"train-server/common/mongom": "mongom",
+			"go.mongodb.org/mongo-driver/bson/primitive": "primitive",
 		},
 		fieldNamer:    DefaultFieldNamer{},
 		marshalers:    make(map[reflect.Type]bool),

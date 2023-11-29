@@ -485,6 +485,11 @@ func (g *Generator) genStructMarshaler(t reflect.Type) error {
 		tag := field.Tag.Get("bson")
 		if tag == "_id" {
 			fmt.Fprintln(g.out, "func (v *"+typ+")PK()any{")
+			if field.Type.String() == "primitive.ObjectID" {
+				fmt.Fprintln(g.out, "if v."+field.Name+" == primitive.NilObjectID{")
+				fmt.Fprintln(g.out, "v."+field.Name+" = primitive.NewObjectID()")
+				fmt.Fprintln(g.out, "}")
+			}
 			fmt.Fprintln(g.out, "   return v."+field.Name)
 			fmt.Fprintln(g.out, "}")
 			break
