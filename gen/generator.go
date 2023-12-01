@@ -503,9 +503,7 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 	}
 	fmt.Fprintln(g.out, "}")
 
-	fmt.Fprintf(g.out, `func (v *%s) Flush() ([]DataInterface,[]DataInterface) {
-	outSave := make([]DataInterface, 0, 4)
-	outDelete:=make([]DataInterface, 0,4)
+	fmt.Fprintf(g.out, `func (v *%s) FlushWithOut(outSave,outDelete * []DataInterface) {
 	for k, s := range v.saveMap {
 		if !s.NeedSave {
 			continue
@@ -516,7 +514,7 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 			if !ok {
 				panic("unknown Flush %s:" + k)
 			}
-            outSave = append(outSave, f(v, s.Data))
+            *outSave = append(*outSave, f(v, s.Data))
         }else if  s.Data==nil && s.MapData!=nil{
 			if len(s.MapData)>0{
 				f, ok := saveMapFunc%s[k]
@@ -524,7 +522,7 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 					panic("unknown Flush %s:" + k)
 				}
 	            for _,md:=range s.MapData{
-	              outSave = append(outSave, f(v, md))
+	              *outSave = append(*outSave, f(v, md))
 				}
 			}
         }
@@ -534,12 +532,11 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 				panic("unknown Flush Delete %s:" + k)
 			}
 			for _, md := range s.DelData {
-				outDelete = append(outDelete, f(v, md))
+				*outDelete = append(*outDelete, f(v, md))
 			}
 		}
 	}
 	clear(v.saveMap)
-	return outSave,outDelete
 }
 `, typeName, typeName, typeName, typeName, typeName, typeName, typeName)
 }
