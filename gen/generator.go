@@ -356,7 +356,19 @@ func (v *%s)GetAll%ss() %s  {
 	if save.MapData==nil{
 		save.MapData = map[int64]unsafe.Pointer{}
 	}
-	out:=make(%s,len(v.%s))
+	newObj :=make([]*%s,0,len(save.MapData))
+	for key,value:=range save.MapData{
+		obj:=(*%s)(value)
+		if save.DelData != nil{
+			if _, ok := save.DelData[obj.%s]; ok {
+				continue
+			}
+		}
+		if _,ok:=v.%s[key];!ok{
+			newObj = append(newObj,obj)
+		}
+	}
+	out:=make(%s,len(v.%s)+len(newObj))
 	for _,tmp:=range v.%s {
 		if save.DelData!=nil{
 			if _,ok:=save.DelData[tmp.%s];ok{
@@ -370,13 +382,29 @@ func (v *%s)GetAll%ss() %s  {
 			}
 		}
 		cpy:=tmp.DeepCopy()
-		out[tmp.%s] = tmp.DeepCopy()
+		out[tmp.%s] =cpy
 		save.MapData[tmp.%s] = unsafe.Pointer(cpy)
+	}
+	for _,tmp:=range newObj {
+		out[tmp.%s] = tmp
 	}
 	return out
 }
-`, typeName, valueType.Name(), ttType, valueType.Name(), valueType.Name(), ttType, n, n, keyField.Name,
-				keyField.Name, keyField.Name, valueType.Name(), keyField.Name, keyField.Name)
+`, typeName, valueType.Name(), ttType,
+				valueType.Name(),
+				valueType.Name(),
+				valueType.Name(),
+				valueType.Name(),
+				keyField.Name,
+				n,
+				ttType, n,
+				n,
+				keyField.Name,
+				keyField.Name,
+				keyField.Name, valueType.Name(),
+				keyField.Name,
+				keyField.Name,
+				keyField.Name)
 
 			lowerKeyFieldName := ToLowerFirst(keyField.Name)
 			fmt.Fprintf(g.out, `func (v *%s) Get%s(%s %s) (*%s, bool) {
