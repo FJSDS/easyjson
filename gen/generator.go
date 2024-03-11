@@ -63,11 +63,10 @@ type Generator struct {
 func NewGenerator(filename string) *Generator {
 	ret := &Generator{
 		imports: map[string]string{
-			pkgWriter:                    "jwriter",
-			pkgLexer:                     "jlexer",
-			pkgEasyJSON:                  "easyjson",
-			"encoding/json":              "json",
-			"train-server/common/mongom": "mongom",
+			pkgWriter:       "jwriter",
+			pkgLexer:        "jlexer",
+			pkgEasyJSON:     "easyjson",
+			"encoding/json": "json",
 			"go.mongodb.org/mongo-driver/bson/primitive": "primitive",
 		},
 		fieldNamer:    DefaultFieldNamer{},
