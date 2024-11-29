@@ -21,7 +21,7 @@ func Test_getModulePath(t *testing.T) {
 		},
 		"actual easyjson go.mod": {
 			goModPath: "../go.mod",
-			want:      "github.com/mailru/easyjson",
+			want:      "github.com/FJSDS/easyjson",
 		},
 		"invalid go.mod with missing module": {
 			goModPath: "./testdata/missing_module.go",
@@ -30,10 +30,12 @@ func Test_getModulePath(t *testing.T) {
 	}
 	for name := range tests {
 		tt := tests[name]
-		t.Run(name, func(t *testing.T) {
-			if got := getModulePath(tt.goModPath); got != tt.want {
-				t.Errorf("getModulePath() = %v, want %v", got, tt.want)
-			}
-		})
+		t.Run(
+			name, func(t *testing.T) {
+				if got := getModulePath(tt.goModPath); got != tt.want {
+					t.Errorf("getModulePath() = %v, want %v", got, tt.want)
+				}
+			},
+		)
 	}
 }

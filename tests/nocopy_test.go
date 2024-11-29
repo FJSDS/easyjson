@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/mailru/easyjson"
+	"github.com/FJSDS/easyjson"
 )
 
 // verifies if string pointer belongs to the given buffer or outside of it
@@ -44,29 +44,33 @@ func TestNocopy(t *testing.T) {
 
 	data = []byte(`{"b": "valueNoCopy"}`)
 	res = NocopyStruct{}
-	allocsPerRun := testing.AllocsPerRun(1000, func() {
-		err := easyjson.Unmarshal(data, &res)
-		if err != nil {
-			t.Error(err)
-		}
-		if res.B != "valueNoCopy" {
-			t.Fatalf("wrong value: %q", res.B)
-		}
-	})
+	allocsPerRun := testing.AllocsPerRun(
+		1000, func() {
+			err := easyjson.Unmarshal(data, &res)
+			if err != nil {
+				t.Error(err)
+			}
+			if res.B != "valueNoCopy" {
+				t.Fatalf("wrong value: %q", res.B)
+			}
+		},
+	)
 	if allocsPerRun > 1 {
 		t.Fatalf("noCopy field unmarshal: expected <= 1 allocs, got %f", allocsPerRun)
 	}
 
 	data = []byte(`{"a": "valueNoCopy"}`)
-	allocsPerRun = testing.AllocsPerRun(1000, func() {
-		err := easyjson.Unmarshal(data, &res)
-		if err != nil {
-			t.Error(err)
-		}
-		if res.A != "valueNoCopy" {
-			t.Fatalf("wrong value: %q", res.A)
-		}
-	})
+	allocsPerRun = testing.AllocsPerRun(
+		1000, func() {
+			err := easyjson.Unmarshal(data, &res)
+			if err != nil {
+				t.Error(err)
+			}
+			if res.A != "valueNoCopy" {
+				t.Fatalf("wrong value: %q", res.A)
+			}
+		},
+	)
 	if allocsPerRun > 2 {
 		t.Fatalf("copy field unmarshal: expected <= 2 allocs, got %f", allocsPerRun)
 	}

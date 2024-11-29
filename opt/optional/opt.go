@@ -1,3 +1,4 @@
+//go:build none
 // +build none
 
 package optional
@@ -5,8 +6,8 @@ package optional
 import (
 	"fmt"
 
-	"github.com/mailru/easyjson/jlexer"
-	"github.com/mailru/easyjson/jwriter"
+	"github.com/FJSDS/easyjson/jlexer"
+	"github.com/FJSDS/easyjson/jwriter"
 )
 
 // template type Optional(A)

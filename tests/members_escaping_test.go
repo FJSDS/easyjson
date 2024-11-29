@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mailru/easyjson"
+	"github.com/FJSDS/easyjson"
 )
 
 func TestMembersEscaping(t *testing.T) {

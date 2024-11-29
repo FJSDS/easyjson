@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mailru/easyjson"
-	"github.com/mailru/easyjson/jwriter"
+	"github.com/FJSDS/easyjson"
+	"github.com/FJSDS/easyjson/jwriter"
 )
 
 type testType interface {
@@ -244,7 +244,7 @@ func TestNestedMarshaler(t *testing.T) {
 		t.Errorf("Can't marshal NestedMarshaler: %s", err)
 	}
 
-	s2 := NestedMarshaler {
+	s2 := NestedMarshaler{
 		Value: &StructWithMarshaler{},
 	}
 
@@ -321,8 +321,10 @@ func TestNil(t *testing.T) {
 	w := httptest.NewRecorder()
 	started, written, err := easyjson.MarshalToHTTPResponseWriter(p, w)
 	if !started || written != 4 || err != nil {
-		t.Errorf("easyjson.MarshalToHTTPResponseWriter() error: %v, written %d, started %t",
-			err, written, started)
+		t.Errorf(
+			"easyjson.MarshalToHTTPResponseWriter() error: %v, written %d, started %t",
+			err, written, started,
+		)
 	}
 
 	if s := w.Body.String(); s != "null" {

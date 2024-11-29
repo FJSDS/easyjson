@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/mailru/easyjson"
+	"github.com/FJSDS/easyjson"
 )
 
 // Target this byte size for initial slice allocation to reduce garbage collection.
@@ -529,11 +529,13 @@ func (g *Generator) genStructDecoder(t reflect.Type) error {
 
 	fmt.Fprintln(g.out, "    default:")
 	if g.disallowUnknownFields {
-		fmt.Fprintln(g.out, `      in.AddError(&jlexer.LexerError{
+		fmt.Fprintln(
+			g.out, `      in.AddError(&jlexer.LexerError{
           Offset: in.GetPos(),
           Reason: "unknown field",
           Data: key,
-      })`)
+      })`,
+		)
 	} else if hasUnknownsUnmarshaler(t) {
 		fmt.Fprintln(g.out, "      out.UnmarshalUnknown(in, key)")
 	} else {
