@@ -323,7 +323,7 @@ func (g *Generator) genModel(t reflect.Type) {
 		if save.DelData!=nil{
 			delete(save.DelData,t.%s)
 		}
-		save.MapData[t.%s] = StateMapValue{Value:unsafe.Pointer(t)}
+		save.MapData[t.%s] = StateMapValue{Value:unsafe.Pointer(t),NeedSave: true}
 		save.NeedSave = true
 }
 `, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name, keyField.Name,
@@ -435,7 +435,7 @@ func (v *%s)GetAll%ss() %s  {
 			save = &DataState{MapData: map[int64]StateMapValue{}}
 			v.saveMap["%s"] = save
 		}
-		save.MapData[%s] = {Value:unsafe.Pointer(out)}
+		save.MapData[%s] = StateMapValue{Value:unsafe.Pointer(out)}
 		return out, true
 	}
 	return nil, false
@@ -575,7 +575,9 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 					panic("unknown Flush %s:" + k)
 				}
 	            for _,md:=range s.MapData{
-	              *outSave = append(*outSave, f(v, md.Value))
+					if md.NeedSave{
+	                  *outSave = append(*outSave, f(v, md.Value))
+					}
 				}
 			}
         }
