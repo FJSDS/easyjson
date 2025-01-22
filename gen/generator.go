@@ -575,7 +575,7 @@ func (g *Generator) genModelFlushSave(t reflect.Type) {
 					panic("unknown Flush %s:" + k)
 				}
 	            for _,md:=range s.MapData{
-	              *outSave = append(*outSave, f(v, md))
+	              *outSave = append(*outSave, f(v, md.Value))
 				}
 			}
         }
