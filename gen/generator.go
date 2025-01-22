@@ -318,12 +318,12 @@ func (g *Generator) genModel(t reflect.Type) {
 			v.saveMap["%s"]=save
 		}
 		if save.MapData == nil {
-			save.MapData= map[int64]unsafe.Pointer{}
+			save.MapData= map[int64]StateMapValue{}
 		}
 		if save.DelData!=nil{
 			delete(save.DelData,t.%s)
 		}
-		save.MapData[t.%s] = unsafe.Pointer(t)
+		save.MapData[t.%s] = StateMapValue{Value:unsafe.Pointer(t)}
 		save.NeedSave = true
 }
 `, typeName, valueType.Name(), valueType.Name(), valueType.Name(), valueType.Name(), keyField.Name, keyField.Name,
@@ -337,7 +337,7 @@ func (g *Generator) genModel(t reflect.Type) {
 			v.saveMap["%s"] = save
 		}
 		if save.DelData==nil{
-			save.DelData= map[int64]unsafe.Pointer{}
+			save.DelData= map[int64]StateMapValue{}
 		}
 		if save.MapData!=nil{
 			delete(save.MapData,t.%s)
@@ -358,11 +358,11 @@ func (v *%s)GetAll%ss() %s  {
 		v.saveMap["%s"] = save
 	}
 	if save.MapData==nil{
-		save.MapData = map[int64]unsafe.Pointer{}
+		save.MapData = map[int64]StateMapValue{}
 	}
 	newObj :=make([]*%s,0,len(save.MapData))
 	for key,value:=range save.MapData{
-		obj:=(*%s)(value)
+		obj:=(*%s)(value.Value)
 		if save.DelData != nil{
 			if _, ok := save.DelData[obj.%s]; ok {
 				continue
@@ -381,13 +381,13 @@ func (v *%s)GetAll%ss() %s  {
 		}
 		if save.MapData!=nil{
 			if v,ok:=save.MapData[tmp.%s];ok{
-				out[tmp.%s] = (*%s)(v)
+				out[tmp.%s] = (*%s)(v.Value)
 				continue
 			}
 		}
 		cpy:=tmp.DeepCopy()
 		out[tmp.%s] =cpy
-		save.MapData[tmp.%s] = unsafe.Pointer(cpy)
+		save.MapData[tmp.%s] = StateMapValue{Value:unsafe.Pointer(cpy)}
 	}
 	for _,tmp:=range newObj {
 		out[tmp.%s] = tmp
@@ -415,25 +415,32 @@ func (v *%s)GetAll%ss() %s  {
 			fmt.Fprintf(
 				g.out, `func (v *%s) Get%s(%s %s) (*%s, bool) {
 	save := v.saveMap["%s"]
-	if save != nil && save.MapData != nil {
-		t, ok := save.MapData[%s]
-		if ok {
-			return (*%s)(t), true
+	if save!=nil{
+		if save.DelData!= nil {
+			if _, ok := save.DelData[%s]; ok {
+				return nil, false
+			}
+		}
+		if save.MapData != nil {
+			t, ok := save.MapData[%s]
+			if ok {
+				return (*%s)(t.Value), true
+			}
 		}
 	}
 	old, ok := v.%s[%s]
 	if ok {
 		out := old.DeepCopy()
 		if save == nil {
-			save = &DataState{MapData: map[int64]unsafe.Pointer{}}
+			save = &DataState{MapData: map[int64]StateMapValue{}}
 			v.saveMap["%s"] = save
 		}
-		save.MapData[%s] = unsafe.Pointer(out)
+		save.MapData[%s] = {Value:unsafe.Pointer(out)}
 		return out, true
 	}
 	return nil, false
 }
-`, typeName, valueType.Name(), lowerKeyFieldName, keyField.Type.Name(), valueType.Name(), valueType.Name(), lowerKeyFieldName,
+`, typeName, valueType.Name(), lowerKeyFieldName, keyField.Type.Name(), valueType.Name(), valueType.Name(), lowerKeyFieldName, lowerKeyFieldName,
 				valueType.Name(), n, lowerKeyFieldName, valueType.Name(), lowerKeyFieldName,
 			)
 			continue
