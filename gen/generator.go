@@ -463,6 +463,7 @@ func (v *%s)GetAll%ss() %s  {
 			ptr = &DataState{}
 			v.saveMap["%s"]=ptr
 		}
+		d.PK()
 		ptr.Data=unsafe.Pointer(d)
 		ptr.NeedSave = true
 }
