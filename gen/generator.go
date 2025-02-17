@@ -323,6 +323,7 @@ func (g *Generator) genModel(t reflect.Type) {
 		if save.DelData!=nil{
 			delete(save.DelData,t.%s)
 		}
+		t.PK()
 		save.MapData[t.%s] = StateMapValue{Value:unsafe.Pointer(t),NeedSave: true}
 		save.NeedSave = true
 }
